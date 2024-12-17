@@ -1,0 +1,369 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Document Extraction
+
+  SAM Template for Konze
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Handler: main.lambda_handler
+    Architectures:
+      - x86_64
+    Tracing: Active
+    Environment:
+      Variables:
+        LOG_LEVEL: INFO
+
+Resources:    
+  Api:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: dev
+      Cors:
+        AllowOrigin: "'*'"
+        AllowHeaders: "'*'"
+        AllowMethods: "'*'"
+
+  KonzeExtractionsecondaryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/secondary_Extraction/
+      Timeout: 580
+      MemorySize: 2048
+      Policies:
+        - Statement:
+            - Sid: "FullAccessToS3Bucket"
+              Effect: "Allow"
+              Action:
+                - "s3:*"
+              Resource:
+                - "arn:aws:s3:::genai-konze-student-documents"
+                - "arn:aws:s3:::genai-konze-student-documents/*"
+                - "arn:aws:s3:::konze-processing-bucket"
+                - "arn:aws:s3:::konze-processing-bucket/*"
+        - Statement:
+            - Sid: "BedrockScopedAccess"
+              Effect: "Allow"
+              Action:
+                - "bedrock:InvokeModel"
+              Resource:
+                - "arn:aws:bedrock:*::foundation-model/*"
+        - Statement:
+            - Sid: "SSMAccess"
+              Effect: "Allow"
+              Action:
+                - "ssm:GetParameter"
+                - "ssm:GetParameters"
+                - "ssm:GetParametersByPath" # Add other SSM actions as needed
+                - "ssm:PutParameter"
+              Resource: "*"
+
+  KonzesecondaryEmbeddingFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/secondary_Embeddings/
+      Timeout: 480
+      MemorySize: 2048
+      Policies:
+        - Statement:
+            - Sid: "FullAccessToS3Bucket"
+              Effect: "Allow"
+              Action:
+                - "s3:*"
+              Resource:
+                - "arn:aws:s3:::genai-konze-student-documents"
+                - "arn:aws:s3:::genai-konze-student-documents/*"
+                - "arn:aws:s3:::konze-processing-bucket"
+                - "arn:aws:s3:::konze-processing-bucket/*"
+        - Statement:
+            - Sid: "InvokeRequestApiFunction"
+              Effect: "Allow"
+              Action: "lambda:InvokeFunction"
+              Resource: !GetAtt KonzeExtractionsecondaryFunction.Arn
+        - Statement:
+            - Sid: "BedrockScopedAccess"
+              Effect: "Allow"
+              Action:
+                - "bedrock:InvokeModel"
+              Resource:
+                - "arn:aws:bedrock:*::foundation-model/*"
+        - Statement:
+            - Sid: "FullAccessToTextract"
+              Effect: "Allow"
+              Action:
+                - "textract:*"
+              Resource: "*"
+        - Statement:
+            - Sid: "SSMAccess"
+              Effect: "Allow"
+              Action:
+                - "ssm:GetParameter"
+                - "ssm:GetParameters"
+                - "ssm:GetParametersByPath" # Add other SSM actions as needed
+                - "ssm:PutParameter"
+              Resource: "*"
+      Environment:
+        Variables:
+          SECONDARY_EXTRACTION_FUNCTION_ARN: !GetAtt KonzeExtractionsecondaryFunction.Arn
+
+
+  KonzesecondaryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/Konzesecondary/
+      Timeout: 480
+      MemorySize: 2048
+      Policies:
+        - Statement:
+            - Sid: "FullAccessToS3Bucket"
+              Effect: "Allow"
+              Action:
+                - "s3:*"
+              Resource:
+                - "arn:aws:s3:::genai-konze-student-documents"
+                - "arn:aws:s3:::genai-konze-student-documents/*"
+                - "arn:aws:s3:::konze-processing-bucket"
+                - "arn:aws:s3:::konze-processing-bucket/*"
+        - Statement:
+            - Sid: "InvokeRequestApiFunction"
+              Effect: "Allow"
+              Action: "lambda:InvokeFunction"
+              Resource: !GetAtt KonzesecondaryEmbeddingFunction.Arn
+        - Statement:
+            - Sid: "BedrockScopedAccess"
+              Effect: "Allow"
+              Action:
+                - "bedrock:InvokeModel"
+              Resource:
+                - "arn:aws:bedrock:*::foundation-model/*"
+        - Statement:
+            - Sid: "FullAccessToTextract"
+              Effect: "Allow"
+              Action:
+                - "textract:*"
+              Resource: "*"
+        - Statement:
+            - Sid: "SSMAccess"
+              Effect: "Allow"
+              Action:
+                - "ssm:GetParameter"
+                - "ssm:GetParameters"
+                - "ssm:GetParametersByPath" # Add other SSM actions as needed
+                - "ssm:PutParameter"
+              Resource: "*"
+      Environment:
+        Variables:
+          SECONDARY_EMBEDDING_FUNCTION_ARN: !GetAtt KonzesecondaryEmbeddingFunction.Arn
+
+  KonzeExtractionprimaryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/primary_Extraction/
+      Timeout: 580
+      MemorySize: 2048
+      Policies:
+        - Statement:
+            - Sid: "FullAccessToS3Bucket"
+              Effect: "Allow"
+              Action:
+                - "s3:*"
+              Resource:
+                - "arn:aws:s3:::genai-konze-student-documents"
+                - "arn:aws:s3:::genai-konze-student-documents/*"
+                - "arn:aws:s3:::konze-processing-bucket"
+                - "arn:aws:s3:::konze-processing-bucket/*"
+        - Statement:
+            - Sid: "BedrockScopedAccess"
+              Effect: "Allow"
+              Action:
+                - "bedrock:InvokeModel"
+              Resource:
+                - "arn:aws:bedrock:*::foundation-model/*"
+        - Statement:
+            - Sid: "SSMAccess"
+              Effect: "Allow"
+              Action:
+                - "ssm:GetParameter"
+                - "ssm:GetParameters"
+                - "ssm:GetParametersByPath" # Add other SSM actions as needed
+                - "ssm:PutParameter"
+              Resource: "*"
+
+  KonzeprimaryEmbeddingFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/primary_Embeddings/
+      Timeout: 480
+      MemorySize: 2048
+      Policies:
+        - Statement:
+            - Sid: "FullAccessToS3Bucket"
+              Effect: "Allow"
+              Action:
+                - "s3:*"
+              Resource:
+                - "arn:aws:s3:::genai-konze-student-documents"
+                - "arn:aws:s3:::genai-konze-student-documents/*"
+                - "arn:aws:s3:::konze-processing-bucket"
+                - "arn:aws:s3:::konze-processing-bucket/*"
+        - Statement:
+            - Sid: "InvokeRequestApiFunction"
+              Effect: "Allow"
+              Action: "lambda:InvokeFunction"
+              Resource: !GetAtt KonzeExtractionprimaryFunction.Arn
+        - Statement:
+            - Sid: "BedrockScopedAccess"
+              Effect: "Allow"
+              Action:
+                - "bedrock:InvokeModel"
+              Resource:
+                - "arn:aws:bedrock:*::foundation-model/*"
+        - Statement:
+            - Sid: "FullAccessToTextract"
+              Effect: "Allow"
+              Action:
+                - "textract:*"
+              Resource: "*"
+        - Statement:
+            - Sid: "SSMAccess"
+              Effect: "Allow"
+              Action:
+                - "ssm:GetParameter"
+                - "ssm:GetParameters"
+                - "ssm:GetParametersByPath" # Add other SSM actions as needed
+                - "ssm:PutParameter"
+              Resource: "*"
+      Environment:
+        Variables:
+          PRIMARY_EXTRACTION_FUNCTION_ARN: !GetAtt KonzeExtractionprimaryFunction.Arn 
+
+  KonzeprimaryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/Konzeprimary/
+      Timeout: 480
+      MemorySize: 2048
+      Policies:
+        - Statement:
+            - Sid: "FullAccessToS3Bucket"
+              Effect: "Allow"
+              Action:
+                - "s3:*"
+              Resource:
+                - "arn:aws:s3:::genai-konze-student-documents"
+                - "arn:aws:s3:::genai-konze-student-documents/*"
+                - "arn:aws:s3:::konze-processing-bucket"
+                - "arn:aws:s3:::konze-processing-bucket/*"
+        - Statement:
+            - Sid: "InvokeRequestApiFunction"
+              Effect: "Allow"
+              Action: "lambda:InvokeFunction"
+              Resource: !GetAtt KonzeprimaryEmbeddingFunction.Arn
+        - Statement:
+            - Sid: "BedrockScopedAccess"
+              Effect: "Allow"
+              Action:
+                - "bedrock:InvokeModel"
+              Resource:
+                - "arn:aws:bedrock:*::foundation-model/*"
+        - Statement:
+            - Sid: "FullAccessToTextract"
+              Effect: "Allow"
+              Action:
+                - "textract:*"
+              Resource: "*"
+        - Statement:
+            - Sid: "SSMAccess"
+              Effect: "Allow"
+              Action:
+                - "ssm:GetParameter"
+                - "ssm:GetParameters"
+                - "ssm:GetParametersByPath" # Add other SSM actions as needed
+                - "ssm:PutParameter"
+              Resource: "*"
+      Environment:
+        Variables:
+          PRIMARY_EMBEDDING_FUNCTION_ARN: !GetAtt KonzeprimaryEmbeddingFunction.Arn
+      
+  RequestApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/Request_api/
+      Timeout: 480
+      MemorySize: 2048
+      Policies:
+        - Statement:
+            - Sid: "InvokeRequestApiFunction"
+              Effect: "Allow"
+              Action: "lambda:InvokeFunction"
+              Resource: !GetAtt KonzesecondaryFunction.Arn 
+        - Statement:
+            - Sid: "InvokeRequestApiFunction"
+              Effect: "Allow"
+              Action: "lambda:InvokeFunction"
+              Resource: !GetAtt KonzeprimaryFunction.Arn 
+        - Statement:
+            - Sid: "FullAccessToS3Bucket"
+              Effect: "Allow"
+              Action:
+                - "s3:*"
+              Resource:
+                - "arn:aws:s3:::genai-konze-student-documents"
+                - "arn:aws:s3:::genai-konze-student-documents/*"
+                - "arn:aws:s3:::konze-processing-bucket"
+                - "arn:aws:s3:::konze-processing-bucket/*"
+        - Statement:
+            - Sid: "SSMAccess"
+              Effect: "Allow"
+              Action:
+                - "ssm:GetParameter"
+                - "ssm:GetParameters"
+                - "ssm:GetParametersByPath" # Add other SSM actions as needed
+                - "ssm:PutParameter"
+              Resource: "*"
+      Environment:
+        Variables:
+          SECONDARY_FUNCTION_ARN: !GetAtt KonzesecondaryFunction.Arn 
+          PRIMARY_FUNCTION_ARN: !GetAtt KonzeprimaryFunction.Arn 
+      Events:
+        Root:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /requestapi
+            Method: POST
+
+  ResponseApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/Response_api/
+      Timeout: 480
+      MemorySize: 2048
+      Policies:
+        - Statement:
+            - Sid: "SSMAccess"
+              Effect: "Allow"
+              Action:
+                - "ssm:GetParameter"
+                - "ssm:GetParameters"
+                - "ssm:GetParametersByPath" # Add other SSM actions as needed
+                - "ssm:PutParameter"
+              Resource: "*"
+            - Sid: "FullAccessToS3Bucket"
+              Effect: "Allow"
+              Action:
+                - "s3:*"
+              Resource:
+                - "arn:aws:s3:::genai-konze-student-documents"
+                - "arn:aws:s3:::genai-konze-student-documents/*"
+                - "arn:aws:s3:::konze-processing-bucket"
+                - "arn:aws:s3:::konze-processing-bucket/*"
+      Events:
+        Root:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /responseapi
+            Method: POST
