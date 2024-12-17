@@ -1,0 +1,8 @@
+PyMuPDF
+boto3
+botocore
+langchain
+pdf2image
+langchain_aws
+langchain_community
+poppler-utils
